@@ -1,0 +1,189 @@
+{
+  "name": "ScriptAI - YouTube Script Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-script",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*",
+          "rawBody": false
+        }
+      },
+      "id": "d81ffbf5-0340-4171-855e-1ada4ae3bcc7",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        880,
+        256
+      ],
+      "webhookId": "scriptai-webhook"
+    },
+    {
+      "parameters": {
+        "model": "nvidia/nemotron-3-super-120b-a12b:free",
+        "options": {
+          "maxTokens": 4000,
+          "temperature": 0.75
+        }
+      },
+      "id": "17789c1a-a263-4686-8632-f344ccf4c14c",
+      "name": "OpenRouter Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        480
+      ],
+      "credentials": {
+        "openRouterApi": {
+          "id": "wEdrwb0Qwi6fz1KV",
+          "name": "Smart Script"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are ScriptAI, an elite YouTube scriptwriter with 10+ years of experience writing viral scripts for top creators.\n\nTASK:\nWrite a complete, professional YouTube video script based on the details below.\n\n=== VIDEO DETAILS ===\n📌 Topic / Idea:\n{{ $json.body.idea }}\n\n⏱️ Target Duration: {{ $json.body.duration }} minutes\n🌐 Script Language: {{ $json.body.language }}\n👤 Creator Name: {{ $json.body.name }}\n=== END ===\n\nSTRUCTURE REQUIREMENTS:\n1. 🎣 HOOK (first 5-10 seconds) — a powerful attention-grabbing opening line.\n2. 📢 INTRO — briefly introduce the topic and what the viewer will gain.\n3. 📚 MAIN BODY — break into 3-5 clear sections with subheadings. Add natural transitions.\n4. 🎬 VISUAL / CAMERA CUES — include [B-roll], [Zoom in], [Text on screen], etc. in brackets.\n5. 🎯 OUTRO — strong closing + call-to-action (subscribe, comment, watch next).\n\nSTYLE RULES:\n- Conversational, natural tone — like talking to a friend.\n- Short sentences. Storytelling techniques.\n- Use markdown formatting (## headings, **bold** for emphasis).\n- Approximate 130-150 spoken words per minute of video.\n- Write the ENTIRE script in {{ $json.body.language }} ONLY.\n- NEVER mention that you are an AI.\n- Do NOT add any preamble, explanation, or meta-commentary.\n\nReturn the script directly."
+      },
+      "id": "ab52a996-d4d1-4885-aadb-3b42862a214d",
+      "name": "Basic LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        1120,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"script\": $json.text, \"name\": $('Webhook').item.json.body.name } }}",
+        "options": {}
+      },
+      "id": "54bc3a71-ebdd-46dd-8eaf-4f68b0248721",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get data\nconst llmOut = $('Basic LLM Chain').item.json;\nconst script = llmOut.text || '';\nconst body = $('Webhook').item.json.body;\nconst name = body.name || 'Creator';\nconst idea = body.idea || '';\nconst duration = body.duration || '';\nconst language = body.language || 'Arabic';\n\n// Simple markdown -> HTML\nfunction esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}\nlet html = esc(script)\n  .replace(/^### (.+)$/gm, '<h3 style=\"color:#c4b5fd;margin:24px 0 10px;font-size:18px;font-weight:700;\">$1</h3>')\n  .replace(/^## (.+)$/gm, '<h2 style=\"color:#a78bfa;margin:28px 0 12px;font-size:20px;font-weight:700;border-bottom:1px solid rgba(167,139,250,0.25);padding-bottom:6px;\">$1</h2>')\n  .replace(/^# (.+)$/gm, '<h1 style=\"color:#f0abfc;margin:30px 0 14px;font-size:22px;font-weight:800;\">$1</h1>')\n  .replace(/\\*\\*(.+?)\\*\\*/g, '<strong style=\"color:#fff;\">$1</strong>')\n  .replace(/\\*(.+?)\\*/g, '<em>$1</em>')\n  .replace(/\\[(.+?)\\]/g, '<span style=\"display:inline-block;background:rgba(34,211,238,0.12);color:#67e8f9;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:600;\">[$1]</span>')\n  .replace(/\\n\\n/g, '</p><p style=\"margin:14px 0;line-height:1.85;\">')\n  .replace(/\\n/g, '<br/>');\n\nconst emailHtml = `<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"></head>\n<body style=\"margin:0;padding:0;background:#0a0a12;font-family:'Segoe UI',Tahoma,Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:linear-gradient(135deg,#0a0a12 0%,#15102a 50%,#0a0a12 100%);padding:40px 16px;\">\n    <tr><td align=\"center\">\n      <table width=\"640\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:640px;width:100%;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:20px;overflow:hidden;box-shadow:0 20px 60px rgba(124,92,255,0.15);\">\n        <tr><td style=\"padding:32px 36px;background:linear-gradient(135deg,rgba(124,92,255,0.18),rgba(34,211,238,0.10));border-bottom:1px solid rgba(255,255,255,0.06);\">\n          <div style=\"font-size:22px;font-weight:800;color:#fff;letter-spacing:-0.5px;\">🎬 ScriptAI</div>\n          <div style=\"font-size:13px;color:#a5a7c0;margin-top:6px;\">Your YouTube Script is Ready</div>\n        </td></tr>\n        <tr><td style=\"padding:32px 36px 8px;\">\n          <p style=\"color:#e7e9f5;font-size:16px;margin:0 0 8px;\">Hi <strong style=\"color:#c4b5fd;\">${esc(name)}</strong>,</p>\n          <p style=\"color:#a5a7c0;font-size:14px;line-height:1.7;margin:0 0 20px;\">Here is your professionally crafted YouTube script. Good luck with your video! 🚀</p>\n          <div style=\"display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;\">\n            <span style=\"display:inline-block;background:rgba(124,92,255,0.15);color:#c4b5fd;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid rgba(124,92,255,0.3);\">⏱️ ${esc(duration)} min</span>\n            <span style=\"display:inline-block;background:rgba(34,211,238,0.15);color:#67e8f9;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid rgba(34,211,238,0.3);\">🌐 ${esc(language)}</span>\n          </div>\n          <div style=\"background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:24px 26px;color:#d8dae5;font-size:15px;line-height:1.85;direction:${language === 'Arabic' ? 'rtl' : 'ltr'};\">\n            <p style=\"margin:14px 0;line-height:1.85;\">${html}</p>\n          </div>\n        </td></tr>\n        <tr><td style=\"padding:24px 36px 32px;border-top:1px solid rgba(255,255,255,0.06);text-align:center;\">\n          <p style=\"color:#6b6e8a;font-size:12px;margin:0;\">© ${new Date().getFullYear()} ScriptAI — Crafted with AI</p>\n        </td></tr>\n      </table>\n    </td></tr>\n  </table>\n</body></html>`;\n\nreturn [{ json: { html: emailHtml, name, email: body.email } }];"
+      },
+      "id": "3bb71b47-f484-44f5-88ec-d0204e47fcfe",
+      "name": "Format HTML Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=🎬 سكريبت الفيديو بتاعك جاهز يا {{ $json.name }}",
+        "message": "={{ $json.html }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1888,
+        256
+      ],
+      "id": "149a70f4-90ca-4326-ac70-3f21bf7ababa",
+      "name": "Send a message",
+      "webhookId": "4c1fc835-c41d-494f-8d84-bb3b0dbb73b0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "cPSFKYzSLcQxbrnw",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        [
+          {
+            "node": "Format HTML Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format HTML Email": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "3b60f171-2851-4f7f-990c-b28cc98550eb",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d5abfaa60178f35c7bb78ae97b09c035844f7d7ee88e85ec67956532311dfca4"
+  },
+  "nodeGroups": [],
+  "id": "Sqb8CrJBvoF0siVz",
+  "tags": []
+}
