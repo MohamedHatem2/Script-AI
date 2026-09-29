@@ -1,0 +1,266 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-script",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*",
+          "rawBody": false
+        }
+      },
+      "id": "142b598a-4a74-4f30-9f95-0e16af703a35",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        176,
+        -112
+      ],
+      "webhookId": "scriptai-webhook"
+    },
+    {
+      "parameters": {
+        "model": "openrouter/free",
+        "options": {
+          "maxTokens": 6000,
+          "responseFormat": "text",
+          "temperature": 0.3
+        }
+      },
+      "id": "e264d8ad-c034-4560-be97-90e455af8e17",
+      "name": "OpenRouter Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        368,
+        112
+      ],
+      "credentials": {
+        "openRouterApi": {
+          "id": "wEdrwb0Qwi6fz1KV",
+          "name": "Smart Script"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are ScriptAI, a professional YouTube scriptwriter.\n\nSTRICT RULES:\n1. Output ONLY valid JSON. Start with { end with }.\n2. No thinking. No planning. No word counting. No notes.\n3. Write REAL full content. No placeholders.\n\nVIDEO:\nIdea: {{ $json.body.idea }}\nDuration: {{ $json.body.duration }} minutes\nLanguage: {{ $json.body.language }}\nNiche: {{ $json.body.contentType }}\nCreator: {{ $json.body.name }}\n\nLANGUAGE:\n- If Language = English → ALL text in English (script + titles + description + tags + hooks + headers)\n- If Language = Arabic → ALL text in Arabic\nNever mix.\n\nJSON:\n{\n  \"script\": \"full script with real line breaks using \\\\n\",\n  \"youtube\": {\n    \"titles\": [\"title1\", \"title2\", \"title3\"],\n    \"description\": \"SEO description with timestamps + CTA + hashtags\",\n    \"tags\": [\"tag1\", \"tag2\", \"tag3\", \"tag4\", \"tag5\", \"tag6\", \"tag7\", \"tag8\"]\n  },\n  \"hooks\": [\"hook1\", \"hook2\", \"hook3\"]\n}\n\nCRITICAL — SCRIPT MUST BE STRUCTURED WITH THESE HEADERS:\n\nWhen Language = English, the script field MUST contain exactly:\n\n## HOOK\n(3 short punchy lines)\n\n## INTRO\n(introduce topic + what viewer gains + open loop)\n\n## SECTION 1: [Clear Title]\n(main content paragraphs)\n\n## SECTION 2: [Clear Title]\n(main content paragraphs)\n\n## SECTION 3: [Clear Title]\n(main content paragraphs)\n\n## OUTRO\n(close loop + subscribe CTA + comment question + next video tease)\n\nWhen Language = Arabic, use:\n## الافتتاحية (HOOK)\n## المقدمة (INTRO)\n## الجزء الأول: [عنوان]\n## الجزء الثاني: [عنوان]\n## الجزء الثالث: [عنوان]\n## الخاتمة (OUTRO)\n\nEach section must be separated by a blank line.\nWrite a complete spoken script for about {{ $json.body.duration }} minutes.\nConversational. No [CAM]. No stage directions. No placeholders.\nOutput ONLY the JSON."
+      },
+      "id": "25edcdfb-f12e-4829-897d-d479e75c6be9",
+      "name": "Basic LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        368,
+        -112
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ========== Parse v5 - kill CoT / word-counting dumps ==========\nconst body = $('Webhook').first().json.body || {};\nconst rawText = String($('Basic LLM Chain').first().json.text || '');\n\nconst name = body.name || 'Creator';\nconst email = body.email || '';\nconst idea = body.idea || '';\nconst duration = body.duration || '';\nconst language = body.language || 'Arabic';\nconst contentType = body.contentType || 'other';\n\nfunction cleanRaw(text) {\n  let t = text;\n  // Kill common CoT / planning blocks\n  const kill = [\n    /Here's a thinking process:[\\s\\S]*/gi,\n    /thinking process:[\\s\\S]*/gi,\n    /Analyze the Request:[\\s\\S]*/gi,\n    /Let me think[\\s\\S]*/gi,\n    /Step[- ]by[- ]step[\\s\\S]*/gi,\n    /My reasoning:[\\s\\S]*/gi,\n    /<think>[\\s\\S]*?<\\/think>/gi,\n    /\\[thinking\\][\\s\\S]*?\\[\\/thinking\\]/gi,\n    /```thinking[\\s\\S]*?```/gi,\n    /```json\\s*/gi,\n    /```\\s*/g,\n    /Make sure total words[\\s\\S]*/gi,\n    /Let's draft[\\s\\S]*/gi,\n    /We'll write roughly[\\s\\S]*/gi,\n    /We need to count words[\\s\\S]*/gi,\n    /I'll write and then approximate[\\s\\S]*/gi,\n    /Now we need to output JSON[\\s\\S]*/gi,\n    /Now total words[\\s\\S]*/gi,\n    /Great, \\d+ words[\\s\\S]*/gi,\n    /approx 750[\\s\\S]*/gi,\n    /We must escape newlines[\\s\\S]*/gi,\n    /We'll construct script string[\\s\\S]*/gi,\n  ];\n  for (const re of kill) t = t.replace(re, '');\n  return t.trim();\n}\n\nfunction unescapeString(s) {\n  if (typeof s !== 'string') return '';\n  return s\n    .replace(/\\\\n/g, '\\n')\n    .replace(/\\\\r/g, '\\r')\n    .replace(/\\\\t/g, '\\t')\n    .replace(/\\\\\"/g, '\"')\n    .replace(/\\\\\\\\/g, '\\\\');\n}\n\nfunction tryParseJson(text) {\n  const first = text.indexOf('{');\n  const last = text.lastIndexOf('}');\n  if (first === -1 || last === -1 || last <= first) return null;\n  let candidate = text.slice(first, last + 1);\n  candidate = candidate.replace(/,\\s*([}\\]])/g, '$1');\n  try { return JSON.parse(candidate); } catch (e) { return null; }\n}\n\nfunction extractField(text, fieldName) {\n  const re = new RegExp('\"' + fieldName + '\"\\\\s*:\\\\s*\"((?:[^\"\\\\\\\\]|\\\\\\\\.)*)\"', 's');\n  const m = text.match(re);\n  if (m) return unescapeString(m[1]);\n  return null;\n}\n\nfunction isMetaLine(line) {\n  const t = line.trim();\n  if (!t) return false;\n  // Word counting / drafting patterns\n  if (/^(Hook|Intro|Section|Outro)\\s*text\\s*:/i.test(t)) return true;\n  if (/^(That's about|So \\d+ words|Count words|Let's count|Now count|Aim ~|Add maybe|Now total|Great,)/i.test(t)) return true;\n  if (/^\\d+\\s+words\\.?$/i.test(t)) return true;\n  if (/^(First|Second|Third|Finally),?\\s+\\w+\\s+words/i.test(t)) return true;\n  if (/word(s)?\\s*[:=]\\s*\\d+/i.test(t)) return true;\n  if (/^(Make sure total|Let's draft|We'll write|We need to|I'll write|Now we need)/i.test(t)) return true;\n  if (/^(HOOK|INTRO|SECTION|OUTRO)\\s*$/i.test(t) === false && /^\\[.*\\]$/.test(t)) return true; // [content] placeholders\n  if (/^\\[Hook spoken|^\\[Intro\\]|^\\[content\\]|^\\[closing\\]/i.test(t)) return true;\n  return false;\n}\n\nfunction stripMetaAndEnglishLeak(script, lang) {\n  if (!script) return script;\n  let lines = script.split('\\n');\n  // Drop pure meta lines\n  lines = lines.filter(line => !isMetaLine(line));\n  // If Arabic, drop mostly-Latin lines (except headers)\n  if (lang === 'Arabic') {\n    lines = lines.filter(line => {\n      const t = line.trim();\n      if (!t || t.startsWith('##')) return true;\n      const ar = (t.match(/[\\u0600-\\u06FF]/g) || []).length;\n      const en = (t.match(/[a-zA-Z]/g) || []).length;\n      if (en > 20 && ar < 5) return false;\n      return true;\n    });\n  }\n  let s = lines.join('\\n');\n  // Hard cut from known tails\n  const cutAt = [\n    /\\n\\s*Make sure total words[\\s\\S]*$/i,\n    /\\n\\s*Let's draft[\\s\\S]*$/i,\n    /\\n\\s*We'll write roughly[\\s\\S]*$/i,\n    /\\n\\s*We need to count[\\s\\S]*$/i,\n    /\\n\\s*Now total words[\\s\\S]*$/i,\n    /\\n\\s*Now we need to output[\\s\\S]*$/i,\n    /\\n\\s*We must escape[\\s\\S]*$/i,\n    /\\n\\s*\"script\"\\s*:\\s*\"[\\s\\S]*$/i,\n  ];\n  for (const re of cutAt) s = s.replace(re, '');\n  return s.replace(/\\n{3,}/g, '\\n\\n').trim();\n}\n\nfunction extractScriptFromText(text) {\n  const markers = [\n    /^##\\s*HOOK\\b/im,\n    /^##\\s*INTRO\\b/im,\n    /^##\\s*الافتتاحية/m,\n    /^##\\s*المقدمة/m,\n    /^##\\s*SECTION\\s*1/im,\n    /^##\\s*الجزء الأول/m,\n    /^##\\s+/m,\n  ];\n  for (const re of markers) {\n    const m = text.search(re);\n    if (m !== -1) return text.slice(m).trim();\n  }\n  return null;\n}\n\nlet script = '';\nlet youtube = { titles: [], description: '', tags: [] };\nlet hooks = [];\n\nconst cleaned = cleanRaw(rawText);\nconst parsed = tryParseJson(cleaned);\n\nif (parsed && typeof parsed === 'object') {\n  script = unescapeString(String(parsed.script || '').trim());\n  if (parsed.youtube && typeof parsed.youtube === 'object') {\n    youtube = {\n      titles: Array.isArray(parsed.youtube.titles) ? parsed.youtube.titles.filter(Boolean) : [],\n      description: typeof parsed.youtube.description === 'string' ? parsed.youtube.description : '',\n      tags: Array.isArray(parsed.youtube.tags) ? parsed.youtube.tags.filter(Boolean) : [],\n    };\n  }\n  hooks = Array.isArray(parsed.hooks) ? parsed.hooks.filter(Boolean) : [];\n}\n\nif (!script || script.length < 80) {\n  const manual = extractField(cleaned, 'script');\n  if (manual && manual.length > 80) script = manual;\n}\n\nif (!script || script.length < 80) {\n  const extracted = extractScriptFromText(cleaned);\n  if (extracted && extracted.length > 80) script = extracted;\n}\n\n// Aggressive meta strip\nscript = stripMetaAndEnglishLeak(script, language);\nscript = script\n  .replace(/^[\\s\\{\\}]*\"script\"\\s*:\\s*\"/i, '')\n  .replace(/\"\\s*,\\s*\"youtube\"[\\s\\S]*$/i, '')\n  .replace(/\\\\n/g, '\\n')\n  .trim();\nscript = stripMetaAndEnglishLeak(script, language);\n\nif (!script || script.length < 50) {\n  script = language === 'Arabic'\n    ? 'تعذر توليد السكريبت بشكل صحيح. جرب مرة تانية أو غيّر الموديل.'\n    : 'Failed to generate the script correctly. Please try again or switch the model.';\n}\n\nreturn [{\n  json: {\n    script,\n    youtube,\n    hooks,\n    name,\n    email,\n    idea,\n    duration,\n    language,\n    contentType,\n  }\n}];\n"
+      },
+      "id": "51e8c368-3c30-48c0-a9b1-54ac48f7bc8b",
+      "name": "Parse Script",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        -112
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ========== Format HTML Email ==========\nconst d = $('Parse Script').first().json;\nconst script = d.script || '';\nconst name = d.name || 'Creator';\nconst email = d.email || '';\nconst duration = d.duration || '';\nconst language = d.language || 'Arabic';\nconst youtube = d.youtube || {};\nconst hooks = d.hooks || [];\n\nfunction esc(s) {\n  return String(s)\n    .replace(/&/g, '&amp;')\n    .replace(/</g, '&lt;')\n    .replace(/>/g, '&gt;');\n}\n\nlet html = esc(script)\n  .replace(/^### (.+)$/gm, '<h3 style=\"color:#f6c453;margin:22px 0 10px;font-size:17px;font-weight:700;\">$1</h3>')\n  .replace(/^## (.+)$/gm, '<h2 style=\"color:#ff5b3a;margin:26px 0 12px;font-size:19px;font-weight:700;border-bottom:1px solid rgba(255,91,58,0.25);padding-bottom:6px;\">$1</h2>')\n  .replace(/^# (.+)$/gm, '<h1 style=\"color:#ff7a5c;margin:28px 0 14px;font-size:21px;font-weight:800;\">$1</h1>')\n  .replace(/\\*\\*(.+?)\\*\\*/g, '<strong style=\"color:#f6c453;font-weight:700;\">$1</strong>')\n  .replace(/\\*(.+?)\\*/g, '<em style=\"color:#9a9288;\">$1</em>')\n  .replace(/\\[([^\\]]+)\\]/g, '<span style=\"display:inline-block;background:rgba(255,91,58,0.12);color:#ff7a5c;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;border:1px solid rgba(255,91,58,0.25);margin:2px 0;\">[$1]</span>')\n  .replace(/\\n\\n/g, '</p><p style=\"margin:14px 0;line-height:1.85;\">')\n  .replace(/\\n/g, '<br/>');\n\nconst titles = (youtube.titles || []).map(t =>\n  `<li style=\"padding:8px 12px;background:#141210;border:1px solid rgba(255,240,220,0.09);border-radius:6px;margin-bottom:6px;font-size:14px;font-weight:600;color:#f4efe8;\">${esc(t)}</li>`\n).join('');\n\nconst hooksHtml = (hooks || []).map(h =>\n  `<li style=\"padding:8px 12px;background:#141210;border:1px solid rgba(255,240,220,0.09);border-radius:6px;margin-bottom:6px;font-size:14px;font-weight:600;color:#f4efe8;\">${esc(h)}</li>`\n).join('');\n\nconst tagsHtml = (youtube.tags || []).map(tg =>\n  `<span style=\"display:inline-block;background:rgba(255,91,58,0.12);color:#ff5b3a;border:1px solid rgba(255,91,58,0.3);padding:4px 10px;border-radius:999px;font-size:11px;font-weight:600;margin:3px;\">${esc(tg)}</span>`\n).join('');\n\nconst metaBlock = (titles || youtube.description || tagsHtml || hooksHtml) ? `\n  <tr><td style=\"padding:8px 36px 0;\">\n    <div style=\"background:rgba(255,240,220,0.03);border:1px solid rgba(255,240,220,0.09);border-radius:12px;padding:20px;\">\n      ${titles ? `<div style=\"font-family:'Courier New',monospace;font-size:11px;font-weight:700;letter-spacing:1px;color:#9a9288;text-transform:uppercase;margin-bottom:10px;\">TITLES</div><ul style=\"list-style:none;padding:0;margin:0 0 20px;\">${titles}</ul>` : ''}\n      ${hooksHtml ? `<div style=\"font-family:'Courier New',monospace;font-size:11px;font-weight:700;letter-spacing:1px;color:#9a9288;text-transform:uppercase;margin-bottom:10px;\">HOOKS</div><ul style=\"list-style:none;padding:0;margin:0 0 20px;\">${hooksHtml}</ul>` : ''}\n      ${youtube.description ? `<div style=\"font-family:'Courier New',monospace;font-size:11px;font-weight:700;letter-spacing:1px;color:#9a9288;text-transform:uppercase;margin-bottom:10px;\">DESCRIPTION</div><div style=\"font-size:13px;line-height:1.7;color:#9a9288;white-space:pre-wrap;margin-bottom:20px;\">${esc(youtube.description)}</div>` : ''}\n      ${tagsHtml ? `<div style=\"font-family:'Courier New',monospace;font-size:11px;font-weight:700;letter-spacing:1px;color:#9a9288;text-transform:uppercase;margin-bottom:10px;\">TAGS</div><div>${tagsHtml}</div>` : ''}\n    </div>\n  </td></tr>` : '';\n\nconst emailHtml = `<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"></head>\n<body style=\"margin:0;padding:0;background:#0f0e0d;font-family:'IBM Plex Sans Arabic','Segoe UI',Tahoma,Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#0f0e0d;padding:40px 16px;\">\n    <tr><td align=\"center\">\n      <table width=\"640\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:640px;width:100%;background:#191715;border:1px solid rgba(255,240,220,0.09);border-radius:16px;overflow:hidden;\">\n        <tr><td style=\"padding:28px 36px;border-bottom:1px solid rgba(255,240,220,0.06);\">\n          <div style=\"font-size:20px;font-weight:800;color:#f4efe8;letter-spacing:-0.5px;\">🎬 ScriptAI</div>\n          <div style=\"font-size:13px;color:#9a9288;margin-top:4px;\">سكريبتك جاهز</div>\n        </td></tr>\n        <tr><td style=\"padding:28px 36px 8px;\">\n          <p style=\"color:#f4efe8;font-size:16px;margin:0 0 8px;\">أهلاً <strong style=\"color:#ff5b3a;\">${esc(name)}</strong>،</p>\n          <p style=\"color:#9a9288;font-size:14px;line-height:1.7;margin:0 0 20px;\">ده السكريبت الاحترافي بتاعك. يارب الفيديو يعمل نجاح كبير! 🚀</p>\n          <div style=\"margin-bottom:24px;\">\n            <span style=\"display:inline-block;background:rgba(255,91,58,0.12);color:#ff5b3a;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid rgba(255,91,58,0.3);\">⏱️ ${esc(duration)} دقيقة</span>\n            <span style=\"display:inline-block;background:rgba(246,196,83,0.12);color:#f6c453;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid rgba(246,196,83,0.3);margin-inline-start:6px;\">🌐 ${esc(language)}</span>\n          </div>\n        </td></tr>${metaBlock}\n        <tr><td style=\"padding:24px 36px 8px;\">\n          <div style=\"font-family:'Courier New',monospace;font-size:11px;font-weight:700;letter-spacing:1px;color:#9a9288;text-transform:uppercase;margin-bottom:10px;\">SCRIPT</div>\n          <div style=\"background:rgba(255,240,220,0.03);border:1px solid rgba(255,240,220,0.06);border-radius:12px;padding:24px 26px;color:#d8dae5;font-size:15px;line-height:1.85;direction:${language === 'Arabic' ? 'rtl' : 'ltr'};\">\n            <p style=\"margin:14px 0;line-height:1.85;\">${html}</p>\n          </div>\n        </td></tr>\n        <tr><td style=\"padding:24px 36px 32px;border-top:1px solid rgba(255,240,220,0.06);text-align:center;\">\n          <p style=\"color:#625c54;font-size:12px;margin:0;\">© ${new Date().getFullYear()} ScriptAI</p>\n        </td></tr>\n      </table>\n    </td></tr>\n  </table>\n</body></html>`;\n\nreturn [{ json: { html: emailHtml, name, email, script: d.script, youtube: d.youtube, hooks: d.hooks, duration: d.duration, language: d.language, contentType: d.contentType } }];"
+      },
+      "id": "03789e2b-18fc-4bd1-9702-3877f4e9eaf8",
+      "name": "Format HTML Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        -112
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=🎬 سكريبت الفيديو بتاعك جاهز يا {{ $json.name }}",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        -112
+      ],
+      "id": "e29dbaaa-f34c-48c4-b345-cb412f9def53",
+      "name": "Send a message",
+      "webhookId": "4c1fc835-c41d-494f-8d84-bb3b0dbb73b0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "cPSFKYzSLcQxbrnw",
+          "name": "Gmail account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "success",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "s2",
+              "name": "script",
+              "value": "={{ $('Format HTML Email').item.json.script }}",
+              "type": "string"
+            },
+            {
+              "id": "s4",
+              "name": "youtube",
+              "value": "={{ $('Format HTML Email').item.json.youtube }}",
+              "type": "object"
+            },
+            {
+              "id": "s5",
+              "name": "hooks",
+              "value": "={{ $('Format HTML Email').item.json.hooks }}",
+              "type": "array"
+            },
+            {
+              "id": "s6",
+              "name": "name",
+              "value": "={{ $('Format HTML Email').item.json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "s7",
+              "name": "emailSent",
+              "value": "={{ !$json.error }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1344,
+        -112
+      ],
+      "id": "aeb68b61-19db-45f3-84ee-850e08a9d401",
+      "name": "Prepare Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "45a1c9a6-a33a-4e2a-99e3-b839b595c4bf",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1568,
+        -112
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Parse Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Script": {
+      "main": [
+        [
+          {
+            "node": "Format HTML Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format HTML Email": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Prepare Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d5abfaa60178f35c7bb78ae97b09c035844f7d7ee88e85ec67956532311dfca4"
+  }
+}

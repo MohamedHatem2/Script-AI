@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ScriptAI — مولّد سكريبتات يوتيوب</title>
+    <meta name="description" content="AI-powered YouTube script generator" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <noscript>
+      <div style="padding:40px;text-align:center;font-family:sans-serif">
+        ScriptAI requires JavaScript to run. Please enable it.
+      </div>
+    </noscript>
+
+    <div class="bg-stage" aria-hidden="true">
+      <div class="bg-glow"></div>
+      <div class="bg-grid-fine"></div>
+      <div class="bg-grid-coarse"></div>
+      <div class="bg-vignette"></div>
+    </div>
+
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z" />
+            <path d="M2 17l10 5 10-5" />
+            <path d="M2 12l10 5 10-5" />
+          </svg>
+        </div>
+        <span class="brand-name">ScriptAI</span>
+        <span class="badge">v1.2</span>
+      </div>
+      <div class="controls">
+        <button id="langToggle" class="ctrl-btn" aria-label="Switch language">
+          <span class="ctrl-label" id="langLabel">EN</span>
+        </button>
+        <button id="themeToggle" class="ctrl-btn" aria-label="Toggle theme">
+          <span id="themeIcon">🌙</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="stage">
+      <!-- STEP 1 -->
+      <section id="step-1" class="step active">
+        <div class="card">
+          <div class="card-head">
+            <div class="badge-pill">
+              <span class="dot"></span>
+              <span data-i18n="step1.badge">الخطوة ٠١</span>
+            </div>
+            <h1 data-i18n="step1.title">حوّل فكرتك لسكريبت احترافي</h1>
+            <p data-i18n="step1.subtitle">
+              اكتب فكرتك، واختار المدة، وسيب الـ AI يكتبلك سكريبت جاهز للتصوير — ويوصل على إيميلك.
+            </p>
+          </div>
+
+          <form id="formStep1" novalidate autocomplete="on">
+            <div class="field">
+              <label data-i18n="step1.name">الاسم</label>
+              <div class="input-wrap">
+                <input type="text" id="name" required autocomplete="name" placeholder="Mohamed Ahmed" />
+              </div>
+              <span class="error-msg" data-i18n="err.required">هذا الحقل مطلوب</span>
+            </div>
+
+            <div class="field">
+              <label data-i18n="step1.email">البريد الإلكتروني</label>
+              <div class="input-wrap">
+                <input type="email" id="email" required autocomplete="email" placeholder="you@example.com" />
+              </div>
+              <span class="error-msg" data-i18n="err.email">من فضلك أدخل إيميل صحيح</span>
+            </div>
+
+            <button type="submit" class="primary-btn">
+              <span data-i18n="step1.continue">يلا نبدأ</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <!-- LOADER 1 -->
+      <section id="loader-1" class="step">
+        <div class="loader-wrap">
+          <div class="ai-loader" role="status" aria-label="Loading">
+            <span class="ai-loader-ring"></span>
+            <span class="ai-loader-ring ring-2"></span>
+            <div class="ai-loader-core">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5" />
+                <path d="M2 12l10 5 10-5" />
+              </svg>
+            </div>
+          </div>
+          <p class="loader-text" data-i18n="loader1.text">جاري تجهيز مساحة العمل...</p>
+        </div>
+      </section>
+
+      <!-- STEP 2 -->
+      <section id="step-2" class="step">
+        <div class="card">
+          <div class="card-head">
+            <div class="badge-pill">
+              <span class="dot"></span>
+              <span data-i18n="step2.badge">الخطوة ٠٢</span>
+            </div>
+            <h2 data-i18n="step2.title">تفاصيل الفيديو</h2>
+            <p data-i18n="step2.subtitle">كل معلومة تزودها بتخلي السكريبت أدق وأقوى.</p>
+          </div>
+
+          <form id="formStep2" novalidate>
+            <!-- Idea -->
+            <div class="field">
+              <label data-i18n="step2.idea">فكرة الفيديو / شرحها</label>
+              <div class="input-wrap textarea-wrap">
+                <textarea id="idea" rows="5" required maxlength="1500" placeholder="اكتب فكرتك بالتفصيل... مثال: فيديو عن أفضل 5 أدوات AI لزيادة الإنتاجية في 2025 مع أمثلة عملية"></textarea>
+              </div>
+              <div class="char-count"><span id="charCount">0</span> / 1500</div>
+              <span class="error-msg" data-i18n="err.required">هذا الحقل مطلوب</span>
+            </div>
+
+            <!-- Content Type -->
+            <div class="field">
+              <label data-i18n="step2.contentType">نوع المحتوى</label>
+              <div class="custom-select searchable" id="contentTypeSelect">
+                <button type="button" class="cs-trigger" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="cs-value" data-value="other" data-i18n="content.other">أخرى</span>
+                  <svg class="cs-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+                <div class="cs-menu" role="listbox">
+                  <div class="cs-search-wrap">
+                    <svg class="cs-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="11" cy="11" r="8" />
+                      <path d="m21 21-4.35-4.35" />
+                    </svg>
+                    <input type="text" class="cs-search" placeholder="ابحث..." data-i18n-placeholder="search.placeholder" />
+                  </div>
+                  <ul class="cs-options"></ul>
+                  <div class="cs-empty" data-i18n="search.empty">لا توجد نتائج</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Duration + Script Language -->
+            <div class="field-row">
+              <div class="field">
+                <label data-i18n="step2.duration">مدة الفيديو</label>
+                <div class="custom-select" id="durationSelect">
+                  <button type="button" class="cs-trigger" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="cs-value" data-value="5">5 دقايق</span>
+                    <svg class="cs-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+                  <ul class="cs-menu cs-menu-simple" role="listbox">
+                    <li data-value="3">3 دقايق</li>
+                    <li data-value="5" class="selected">5 دقايق</li>
+                    <li data-value="8">8 دقايق</li>
+                    <li data-value="10">10 دقايق</li>
+                    <li data-value="15">15 دقيقة</li>
+                    <li data-value="20">20 دقيقة</li>
+                    <li data-value="30">30 دقيقة</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="field">
+                <label data-i18n="step2.scriptLang">لغة السكريبت</label>
+                <div class="segmented" id="scriptLangGroup">
+                  <label class="seg">
+                    <input type="radio" name="scriptLang" value="Arabic" checked />
+                    <span>العربية</span>
+                  </label>
+                  <label class="seg">
+                    <input type="radio" name="scriptLang" value="English" />
+                    <span>English</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="actions-row">
+              <button type="button" class="ghost-btn" id="backBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 12H5M12 19l-7-7 7-7" />
+                </svg>
+                <span data-i18n="btn.back">رجوع</span>
+              </button>
+              <button type="submit" class="primary-btn" id="generateBtn">
+                <span data-i18n="step2.generate">ولّد السكريبت</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- LOADER 2 -->
+      <section id="loader-2" class="step">
+        <div class="loader-wrap">
+          <div class="ai-loader big" role="status" aria-label="Generating">
+            <span class="ai-loader-ring"></span>
+            <span class="ai-loader-ring ring-2"></span>
+            <div class="ai-loader-core">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5" />
+                <path d="M2 12l10 5 10-5" />
+              </svg>
+            </div>
+          </div>
+
+          <p class="loader-text big" data-i18n="loader2.text">الـ AI بيكتب السكريبت بتاعك...</p>
+
+          <div class="progress-track" aria-hidden="true">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+
+          <ol class="stages">
+            <li class="stage-item" data-stage="1">
+              <span class="stage-marker"></span>
+              <span class="stage-label" data-i18n="loader2.stage1">قراءة موضوع الفيديو</span>
+            </li>
+            <li class="stage-item" data-stage="2">
+              <span class="stage-marker"></span>
+              <span class="stage-label" data-i18n="loader2.stage2">تحليل المحتوى</span>
+            </li>
+            <li class="stage-item" data-stage="3">
+              <span class="stage-marker"></span>
+              <span class="stage-label" data-i18n="loader2.stage3">تجهيز السكريبت</span>
+            </li>
+          </ol>
+
+          <button type="button" class="ghost-btn cancel-btn" id="cancelBtn">
+            <span data-i18n="btn.cancel">إلغاء</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- STEP 3 -->
+      <section id="step-3" class="step">
+        <div class="card result-card">
+          <div class="card-head result-head">
+            <div>
+              <div class="badge-pill success">
+                <span class="dot"></span>
+                <span data-i18n="step3.badge">تم</span>
+              </div>
+              <h2 data-i18n="step3.title">سكريبتك الاحترافي</h2>
+              <p id="step3Subtitle" data-i18n="step3.subtitle">هنبعتلك نسخة على إيميلك كمان</p>
+            </div>
+          </div>
+
+          <!-- Metadata (Title / Description / Tags / Hooks) -->
+          <div id="metaBlock" class="meta-block hidden">
+            <div class="meta-section">
+              <div class="meta-label" data-i18n="step3.titles">عناوين مقترحة</div>
+              <ul class="meta-list" id="titlesList"></ul>
+            </div>
+            <div class="meta-section">
+              <div class="meta-label" data-i18n="step3.hooks">هوكات بديلة</div>
+              <ul class="meta-list" id="hooksList"></ul>
+            </div>
+            <div class="meta-section">
+              <div class="meta-label" data-i18n="step3.description">الوصف</div>
+              <div class="meta-text" id="descriptionText"></div>
+            </div>
+            <div class="meta-section">
+              <div class="meta-label" data-i18n="step3.tags">الكلمات المفتاحية</div>
+              <div class="chips" id="tagsList"></div>
+            </div>
+          </div>
+
+          <div id="scriptOutput" class="script-output"></div>
+
+          <div class="actions-row end">
+            <button class="ghost-btn" id="copyBtn">
+              <span data-i18n="btn.copy">نسخ</span>
+            </button>
+            <button class="ghost-btn" id="downloadBtn">
+              <span data-i18n="btn.download">تحميل .txt</span>
+            </button>
+            <button class="primary-btn" id="restartBtn">
+              <span data-i18n="btn.restart">سكريبت جديد</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    </main>
+
+    <script src="js/app.js" defer></script>
+  </body>
+</html>
